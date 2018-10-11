@@ -21,16 +21,16 @@ cdb_pack(unsigned num, unsigned char buf[4])
 int
 cdb_make_start(struct cdb_make *cdbmp, int fd)
 {
-  return cdb_make_start_with_writer(cdbmp, fd, &_cdb_posix_file_writer);
+  return cdb_make_start_with_file(cdbmp, _cdb_posix_file_create_from_fd(fd));
 }
 
 int
-cdb_make_start_with_writer(struct cdb_make *cdbmp, int fd, struct cdb_file_writer *writer) {
+cdb_make_start_with_file(struct cdb_make *cdbmp, struct cdb_file *file)
+{
   int rc;
   memset(cdbmp, 0, sizeof(*cdbmp));
-  cdbmp->writer = writer;
-  if ((rc = cdbmp->writer->init(cdbmp)) == 0) {
-    cdbmp->cdb_fd = fd;
+  cdbmp->file = file;
+  if ((rc = cdbmp->file->create(cdbmp->file)) == 0) {
     cdbmp->cdb_dpos = 2048;
     cdbmp->cdb_bpos = cdbmp->cdb_buf + 2048;
   }
@@ -38,10 +38,11 @@ cdb_make_start_with_writer(struct cdb_make *cdbmp, int fd, struct cdb_file_write
 }
 
 int internal_function
-_cdb_make_fullwrite(struct cdb_file_writer *writer, int fd, const unsigned char *buf, unsigned len)
+_cdb_make_fullwrite(struct cdb_make *cdbmp, const unsigned char *buf, unsigned len)
 {
+  struct cdb_file *file = cdbmp->file;
   while(len) {
-    int l = write(fd, buf, len);
+    int l = file->write(cdbmp->file, buf, len);
     if (l > 0) {
       len -= l;
       buf += l;
@@ -56,7 +57,7 @@ int internal_function
 _cdb_make_flush(struct cdb_make *cdbmp) {
   unsigned len = cdbmp->cdb_bpos - cdbmp->cdb_buf;
   if (len) {
-    if (_cdb_make_fullwrite(cdbmp->writer, cdbmp->cdb_fd, cdbmp->cdb_buf, len) < 0)
+    if (_cdb_make_fullwrite(cdbmp, cdbmp->cdb_buf, len) < 0)
       return -1;
     cdbmp->cdb_bpos = cdbmp->cdb_buf;
   }
@@ -77,7 +78,7 @@ _cdb_make_write(struct cdb_make *cdbmp, const unsigned char *ptr, unsigned len)
     l = len / sizeof(cdbmp->cdb_buf);
     if (l) {
       l *= sizeof(cdbmp->cdb_buf);
-      if (_cdb_make_fullwrite(cdbmp->writer, cdbmp->cdb_fd, ptr, l) < 0)
+      if (_cdb_make_fullwrite(cdbmp, ptr, l) < 0)
         return -1;
       ptr += l; len -= l;
     }
@@ -161,8 +162,8 @@ cdb_make_finish_internal(struct cdb_make *cdbmp)
     cdb_pack(hpos[t], p + (t << 3));
     cdb_pack(hcnt[t], p + (t << 3) + 4);
   }
-  if (cdbmp->writer->seek(cdbmp, 0) != 0 ||
-      _cdb_make_fullwrite(cdbmp->writer, cdbmp->cdb_fd, p, 2048) != 0)
+  if (cdbmp->file->seek(cdbmp->file, 0) != 0 ||
+      _cdb_make_fullwrite(cdbmp, p, 2048) != 0)
     return -1;
 
   return 0;
@@ -181,7 +182,7 @@ cdb_make_free(struct cdb_make *cdbmp)
     }
   }
 
-  cdbmp->writer->fini(cdbmp);
+  cdbmp->file->close(cdbmp->file);
 }
 
 int

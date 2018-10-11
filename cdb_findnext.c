@@ -25,10 +25,10 @@ cdb_findinit(struct cdb_find *cdbfp, struct cdb *cdbp,
   if (!n)
     return 0;
   pos = _cdb_unpack(cdbp, cdbfp->cdb_htp, cdb_buf_htab);
-  if (n > (cdbp->cdb_fsize >> 3)
+  if (n > (cdbp->file->fsize >> 3)
       || pos < cdbp->cdb_dend
-      || pos > cdbp->cdb_fsize
-      || cdbfp->cdb_httodo > cdbp->cdb_fsize - pos)
+      || pos > cdbp->file->fsize
+      || cdbfp->cdb_httodo > cdbp->file->fsize - pos)
     return errno = EPROTO, -1;
 
   cdbfp->cdb_htab = pos;
@@ -53,17 +53,17 @@ cdb_findnext(struct cdb_find *cdbfp) {
       cdbfp->cdb_htp = cdbfp->cdb_htab;
     cdbfp->cdb_httodo -= 8;
     if (n) {
-      if (pos > cdbp->cdb_fsize - 8)
+      if (pos > cdbp->file->fsize - 8)
         return errno = EPROTO, -1;
       if (_cdb_unpack(cdbp, pos, cdb_buf_data) == klen) {
-        if (cdbp->cdb_fsize - klen < pos + 8)
+        if (cdbp->file->fsize - klen < pos + 8)
           return errno = EPROTO, -1;
         if (memcmp(cdbfp->cdb_key,
             _cdb_get(cdbp, klen, pos + 8, cdb_buf_data), klen) == 0) {
           n = _cdb_unpack(cdbp, pos + 4, cdb_buf_data);
           pos += 8;
-          if (cdbp->cdb_fsize < n ||
-              cdbp->cdb_fsize - n < pos + klen)
+          if (cdbp->file->fsize < n ||
+              cdbp->file->fsize - n < pos + klen)
             return errno = EPROTO, -1;
           cdbp->cdb_kpos = pos;
           cdbp->cdb_klen = klen;

@@ -26,21 +26,21 @@ nexthash:;
 static int
 remove_record(struct cdb_make *cdbmp, unsigned rpos, unsigned rlen) {
   unsigned pos, len;
-  int r, fd;
+  int r;
+  struct cdb_file *file = cdbmp->file;
 
   len = cdbmp->cdb_dpos - rpos - rlen;
   cdbmp->cdb_dpos -= rlen;
   if (!len)
     return 0;  /* it was the last record, nothing to do */
   pos = rpos;
-  fd = cdbmp->cdb_fd;
   do {
     r = len > sizeof(cdbmp->cdb_buf) ? sizeof(cdbmp->cdb_buf) : len;
-    if (cdbmp->writer->seek(cdbmp, pos + rlen) < 0 ||
-        (r = read(fd, cdbmp->cdb_buf, r)) <= 0)
+    if (cdbmp->file->seek(cdbmp->file, pos + rlen) < 0 ||
+        (r = file->read(file, cdbmp->cdb_buf, r)) <= 0)
       return -1;
-    if (cdbmp->writer->seek(cdbmp, pos) < 0 ||
-        _cdb_make_fullwrite(cdbmp->writer, fd, cdbmp->cdb_buf, r) < 0)
+    if (file->seek(file, pos) < 0 ||
+        _cdb_make_fullwrite(cdbmp, cdbmp->cdb_buf, r) < 0)
       return -1;
     pos += r;
     len -= r;
@@ -56,13 +56,13 @@ zerofill_record(struct cdb_make *cdbmp, unsigned rpos, unsigned rlen) {
     cdbmp->cdb_dpos = rpos;
     return 0;
   }
-  if (cdbmp->writer->seek(cdbmp, rpos) < 0)
+  if (cdbmp->file->seek(cdbmp->file, rpos) < 0)
     return -1;
   memset(cdbmp->cdb_buf, 0, sizeof(cdbmp->cdb_buf));
   cdb_pack(rlen - 8, cdbmp->cdb_buf + 4);
   for(;;) {
     rpos = rlen > sizeof(cdbmp->cdb_buf) ? sizeof(cdbmp->cdb_buf) : rlen;
-    if (_cdb_make_fullwrite(cdbmp->writer, cdbmp->cdb_fd, cdbmp->cdb_buf, rpos) < 0)
+    if (_cdb_make_fullwrite(cdbmp, cdbmp->cdb_buf, rpos) < 0)
       return -1;
     rlen -= rpos;
     if (!rlen) return 0;
@@ -76,9 +76,10 @@ match(struct cdb_make *cdbmp, unsigned pos, const char *key, unsigned klen)
 {
   int len;
   unsigned rlen;
-  if (cdbmp->writer->seek(cdbmp, pos) < 0)
+  struct cdb_file *file = cdbmp->file;
+  if (cdbmp->file->seek(cdbmp->file, pos) < 0)
     return 1;
-  if (read(cdbmp->cdb_fd, cdbmp->cdb_buf, 8) != 8)
+  if (file->read(file, cdbmp->cdb_buf, 8) != 8)
     return 1;
   if (cdb_unpack(cdbmp->cdb_buf) != klen)
     return 0;
@@ -91,7 +92,7 @@ match(struct cdb_make *cdbmp, unsigned pos, const char *key, unsigned klen)
 
   while(klen) {
     len = klen > sizeof(cdbmp->cdb_buf) ? sizeof(cdbmp->cdb_buf) : klen;
-    len = read(cdbmp->cdb_fd, cdbmp->cdb_buf, len);
+    len = file->read(file, cdbmp->cdb_buf, len);
     if (len <= 0)
       return 1;
     if (memcmp(cdbmp->cdb_buf, key, len) != 0)
@@ -146,7 +147,7 @@ findrec(struct cdb_make *cdbmp,
       --cdbmp->cdb_rcnt;
   }
 finish:
-  if (seeked && cdbmp->writer->seek(cdbmp, cdbmp->cdb_dpos) < 0)
+  if (seeked && cdbmp->file->seek(cdbmp->file, cdbmp->cdb_dpos) < 0)
     return -1;
   return ret;
 }

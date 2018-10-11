@@ -19,21 +19,22 @@
 int
 cdb_init(struct cdb *cdbp, int fd)
 {
-  return cdb_init_with_reader(cdbp, fd, &_cdb_posix_file_reader);
+  return cdb_init_with_file(cdbp, _cdb_posix_file_create_from_fd(fd));
 }
 
-int cdb_init_with_reader(struct cdb *cdbp, int fd, struct cdb_file_reader *reader) {
+int
+cdb_init_with_file(struct cdb *cdbp, struct cdb_file *file)
+{
   int rc;
   unsigned dend;
   memset(cdbp, 0, sizeof(*cdbp));
-  cdbp->reader = reader;
-  cdbp->cdb_fd = fd;
-  if ((rc = cdbp->reader->init(cdbp)) == 0) {
+  cdbp->file = file;
+  if ((rc = cdbp->file->open(file)) == 0) {
     cdbp->cdb_vpos = cdbp->cdb_vlen = 0;
     cdbp->cdb_kpos = cdbp->cdb_klen = 0;
     dend = cdb_unpack(cdb_get(cdbp, 4, 0));
     if (dend < 2048) dend = 2048;
-    else if (dend >= cdbp->cdb_fsize) dend = cdbp->cdb_fsize;
+    else if (dend >= cdbp->file->fsize) dend = file->fsize;
     cdbp->cdb_dend = dend;
   }
   return rc;
@@ -42,27 +43,27 @@ int cdb_init_with_reader(struct cdb *cdbp, int fd, struct cdb_file_reader *reade
 void
 cdb_free(struct cdb *cdbp)
 {
-  cdbp->reader->fini(cdbp);
+  cdbp->file->close(cdbp->file);
 }
 
 const void *
 _cdb_get(const struct cdb *cdbp, unsigned len, unsigned pos, unsigned bufid)
 {
-  return cdbp->reader->get(cdbp, len, pos, bufid);
+  return cdbp->file->get(cdbp->file, len, pos, bufid);
 }
 
 const void *
 cdb_get(const struct cdb *cdbp, unsigned len, unsigned pos)
 {
-  if (pos > cdbp->cdb_fsize || cdbp->cdb_fsize - pos < len) {
+  if (pos > cdbp->file->fsize || cdbp->file->fsize - pos < len) {
     errno = EPROTO;
     return NULL;
   }
-  return cdbp->reader->get(cdbp, len, pos, cdb_buf_default);
+  return cdbp->file->get(cdbp->file, len, pos, cdb_buf_default);
 }
 
 int
 cdb_read(const struct cdb *cdbp, void *buf, unsigned len, unsigned pos)
 {
-  return cdbp->reader->read(cdbp, buf, len, pos);
+  return cdbp->file->pread(cdbp->file, buf, len, pos);
 }

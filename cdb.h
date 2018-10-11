@@ -18,25 +18,28 @@ unsigned cdb_hash(const void *buf, unsigned len);
 unsigned cdb_unpack(const unsigned char buf[4]);
 void cdb_pack(unsigned num, unsigned char buf[4]);
 
-struct cdb;
-
-struct cdb_file_reader {
-  int (*init)(struct cdb *cdbp);
-  const void *(*get)(const struct cdb *cdbp, unsigned len, unsigned pos, unsigned bufid);
-  int (*read)(const struct cdb *cdbp, void *buf, unsigned len, unsigned pos);
-  void (*fini)(struct cdb *cdbp);
+struct cdb_file {
+  int (*open)(struct cdb_file *cdbfp);    /* open for reading */
+  int (*create)(struct cdb_file *cdbfp);  /* create for writing */
+  const void *(*get)(struct cdb_file *cdbfp, unsigned len, unsigned pos, unsigned bufid);
+  int (*read)(struct cdb_file *cdbfp, void *buf, unsigned len);
+  int (*pread)(struct cdb_file *cdbfp, void *buf, unsigned len, unsigned pos);
+  int (*seek)(struct cdb_file *cdbfp, unsigned pos);
+  int (*write)(struct cdb_file *cdbfp, const unsigned char *buf, unsigned len);
+  void (*close)(struct cdb_file *cdbfp);
   void *opaque;
+
+  /* meta data of file */
+  unsigned fsize;
 };
 
 struct cdb {
-  int cdb_fd;      /* file descriptor */
   /* private members */
-  unsigned cdb_fsize;    /* datafile size */
   unsigned cdb_dend;    /* end of data ptr */
   unsigned cdb_vpos, cdb_vlen;  /* found data */
   unsigned cdb_kpos, cdb_klen;  /* found key */
 
-  struct cdb_file_reader *reader;
+  struct cdb_file *file;
 };
 
 #define CDB_STATIC_INIT {0,0,0,0,0,0,0,NULL}
@@ -45,12 +48,11 @@ struct cdb {
 #define cdb_datalen(c) ((c)->cdb_vlen)
 #define cdb_keypos(c) ((c)->cdb_kpos)
 #define cdb_keylen(c) ((c)->cdb_klen)
-#define cdb_fileno(c) ((c)->cdb_fd)
 
-/* initialize cdb with builtin posix file reader */
+/* initialize cdb with posix file */
 int cdb_init(struct cdb *cdbp, int fd);
-/* initialize cdb with a customized file reader */
-int cdb_init_with_reader(struct cdb *cdbp, int fd, struct cdb_file_reader *reader);
+/* initialize cdb with a customized file implementation */
+int cdb_init_with_file(struct cdb *cdbp, struct cdb_file *file);
 void cdb_free(struct cdb *cdbp);
 
 int cdb_read(const struct cdb *cdbp,
@@ -91,18 +93,7 @@ int cdb_bread(int fd, void *buf, int len);
 
 /* cdb_make */
 
-struct cdb_make;
-
-struct cdb_file_writer {
-  int (*init)(struct cdb_make *cdbmp);
-  int (*seek)(const struct cdb_make *cdbp, unsigned pos);
-  int (*write)(const struct cdb_make *cdbp, const unsigned char *buf, unsigned len);
-  void (*fini)(struct cdb_make *cdbp);
-  void *opaque;
-};
-
 struct cdb_make {
-  int cdb_fd;      /* file descriptor */
   /* private */
   unsigned cdb_dpos;    /* data position so far */
   unsigned cdb_rcnt;    /* record count so far */
@@ -110,7 +101,7 @@ struct cdb_make {
   unsigned char *cdb_bpos;  /* current buf position */
   struct cdb_rl *cdb_rec[256];  /* list of arrays of record infos */
 
-  struct cdb_file_writer *writer;
+  struct cdb_file *file;
 };
 
 enum cdb_put_mode {
@@ -130,7 +121,7 @@ enum cdb_put_mode {
 };
 
 int cdb_make_start(struct cdb_make *cdbmp, int fd);
-int cdb_make_start_with_writer(struct cdb_make *cdbmp, int fd, struct cdb_file_writer *writer);
+int cdb_make_start_with_file(struct cdb_make *cdbmp, struct cdb_file *file);
 int cdb_make_add(struct cdb_make *cdbmp,
                  const void *key, unsigned klen,
                  const void *val, unsigned vlen);

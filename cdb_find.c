@@ -31,10 +31,10 @@ cdb_find(struct cdb *cdbp, const void *key, unsigned klen)
     return 0;            /* not found */
   httodo = n << 3;        /* bytes of htab to lookup */
   pos = _cdb_unpack(cdbp, htp, cdb_buf_htab);    /* htab position */
-  if (n > (cdbp->cdb_fsize >> 3) /* overflow of httodo ? */
+  if (n > (cdbp->file->fsize >> 3) /* overflow of httodo ? */
       || pos < cdbp->cdb_dend /* is htab inside data section ? */
-      || pos > cdbp->cdb_fsize /* htab start within file ? */
-      || httodo > cdbp->cdb_fsize - pos) /* entrie htab within file ? */
+      || pos > cdbp->file->fsize /* htab start within file ? */
+      || httodo > cdbp->file->fsize - pos) /* entrie htab within file ? */
     return errno = EPROTO, -1;
 
   htab = pos;    /* htab pointer */
