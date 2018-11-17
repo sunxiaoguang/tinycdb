@@ -47,3 +47,4 @@ const void *_cdb_get(const struct cdb *cdbp, unsigned len, unsigned pos, unsigne
 unsigned _cdb_unpack(const struct cdb *cdbp, unsigned at, unsigned bufid);
 
 struct cdb_file *_cdb_posix_file_create_from_fd(int fd);
+int _cdb_posix_file_mlock(struct cdb_file *file);

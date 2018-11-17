@@ -23,6 +23,16 @@ cdb_init(struct cdb *cdbp, int fd)
 }
 
 int
+cdb_init_locked(struct cdb *cdbp, int fd)
+{
+  int rc;
+  if ((rc = cdb_init_with_file(cdbp, _cdb_posix_file_create_from_fd(fd))) == 0) {
+    rc = _cdb_posix_file_mlock(cdbp->file);
+  }
+  return rc;
+}
+
+int
 cdb_init_with_file(struct cdb *cdbp, struct cdb_file *file)
 {
   int rc;

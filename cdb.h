@@ -51,6 +51,8 @@ struct cdb {
 
 /* initialize cdb with posix file */
 int cdb_init(struct cdb *cdbp, int fd);
+/* initialize cdb with posix file and lock all it's content in memory */
+int cdb_init_locked(struct cdb *cdbp, int fd);
 /* initialize cdb with a customized file implementation */
 int cdb_init_with_file(struct cdb *cdbp, struct cdb_file *file);
 void cdb_free(struct cdb *cdbp);

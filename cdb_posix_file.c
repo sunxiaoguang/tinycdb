@@ -114,6 +114,15 @@ _cdb_posix_file_open(struct cdb_file *cdbfp)
   return 0;
 }
 
+int _cdb_posix_file_mlock(struct cdb_file *file) {
+  struct cdb_posix_file_opaque *opaque = file->opaque;
+#ifdef _WIN32
+  return VirtualLock(opaque->cdb_mem, file->fsize) != 0 ? 0 : -1;
+#else
+  return mlock(opaque->cdb_mem, file->fsize);
+#endif /* _WIN32 */
+}
+
 int
 _cdb_posix_file_create(struct cdb_file *cdbfp)
 {
